@@ -8,15 +8,27 @@ function! s:TmuxAvailable()
       return executable('tmux')
 endfunction
 
+function! IsMac()
+    return has('macunix')
+endfunction
+
 " Function to yank to OSC-52.
 function! TmuxYank()
     if !s:TmuxAvailable()
         return
     endif
-    let buffer=system('base64 -w0', @0)
-    let buffer=substitute(buffer, "\n$", "", "")
-    let buffer='\e]52;c;'.buffer.'\x07'
-    silent exe "!echo -ne ".shellescape(buffer)." > ".system("tmux display -p '#{pane_tty}'")
+    if IsMac()
+        " macOS specific implementation
+        let buffer=@0
+        let encoded = system('printf %s ' . shellescape(buffer) . '| base64 | tr -d "\n"')
+        let buffer='\e]52;c;'.encoded.'\x07'
+        call system("printf " . shellescape(buffer) . " > " . shellescape(system("tmux display -p '#{pane_tty}'")))
+    else
+        let buffer=system('base64 -w0', @0)
+        let buffer=substitute(buffer, "\n$", "", "")
+        let buffer='\e]52;c;'.buffer.'\x07'
+        silent exe "!echo -ne ".shellescape(buffer)." > ".system("tmux display -p '#{pane_tty}'")
+    endif
 endfunction
 
 " Autoforward yank events.
